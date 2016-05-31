@@ -11,7 +11,7 @@ variable "region" {
 }
 
 variable "image" {
-  default = "Ubuntu16.04"
+  default = "Ubuntu14.04"
 }
 
 variable "flavor" {
