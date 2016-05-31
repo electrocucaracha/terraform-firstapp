@@ -6,6 +6,19 @@ provider "openstack" {
   auth_url  = "${var.auth_url}"
 }
 
+# Template for controller installation
+resource "template_file" "controller_bash" {
+    template = "${file("controller.tpl")}"
+}
+
+# Template for worker installation
+resource "template_file" "worker_bash" {
+    template = "${file("worker.tpl")}"
+    vars {
+        controller_ip = "${openstack_compute_floatingip_v2.firstapp.address}"
+    }
+}
+
 resource "openstack_networking_network_v2" "private" {
   name = "private"
   region = "${var.region}"
@@ -91,7 +104,7 @@ resource "openstack_compute_instance_v2" "app-controller" {
   key_pair = "${openstack_compute_keypair_v2.firstapp.name}"
   security_groups = [ "${openstack_compute_secgroup_v2.controller.name}" ]
   floating_ip = "${openstack_compute_floatingip_v2.firstapp.address}"
-  user_data = "curl -L -s http://git.openstack.org/cgit/openstack/faafo/plain/contrib/install.sh | bash -s -- -i messaging -i faafo -r api"
+  user_data = "${template_file.controller_bash.rendered}"
 
   network {
     uuid = "${openstack_networking_network_v2.private.id}"
@@ -110,7 +123,7 @@ resource "openstack_compute_instance_v2" "app-worker01" {
   flavor_name = "${var.flavor}"
   key_pair = "${openstack_compute_keypair_v2.firstapp.name}"
   security_groups = [ "${openstack_compute_secgroup_v2.worker.name}" ]
-  user_data = "curl -L -s http://git.openstack.org/cgit/openstack/faafo/plain/contrib/install.sh | bash -s -- -i faafo -r worker -e 'http://${openstack_compute_floatingip_v2.firstapp.address}' -m 'amqp://guest:guest@%${openstack_compute_floatingip_v2.firstapp.address}:5672/"
+  user_data = "${template_file.worker_bash.rendered}"
 
   network {
     uuid = "${openstack_networking_network_v2.private.id}"
